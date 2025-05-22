@@ -15,7 +15,8 @@ import {
   ResolveTree,
   simplifyParsedResolveInfoFragmentWithType,
 } from 'graphql-parse-resolve-info';
-
+import { User } from '@prisma/client';
+import { UUID } from 'crypto';
 
 export const Query = new GraphQLObjectType({
   name: 'Query',
@@ -23,19 +24,25 @@ export const Query = new GraphQLObjectType({
     users: {
       type: new GraphQLList(UserType),
       resolve: async (_, __, context: GqlContext, info) => {
-        try {
-          const resolveTree = parseResolveInfo(info) as ResolveTree;
-          const { fields } = simplifyParsedResolveInfoFragmentWithType(resolveTree, info.returnType);
-          const include = {
-            userSubscribedTo: 'userSubscribedTo' in fields,
-            subscribedToUser: 'subscribedToUser' in fields,
-          };
+        const resolveTree = parseResolveInfo(info) as ResolveTree;
+        const { fields } = simplifyParsedResolveInfoFragmentWithType(
+          resolveTree,
+          info.returnType,
+        );
+        const include = {
+          userSubscribedTo: 'userSubscribedTo' in fields,
+          subscribedToUser: 'subscribedToUser' in fields,
+        };
 
-          return await context.prisma.user.findMany({ include });
-        } catch (error) {
-          console.error("Error fetching users:", error);
-          throw new Error("Failed to fetch users.");
-        }
+        const users: User[] = await context.prisma.user.findMany({
+          include,
+        });
+
+        users.forEach((user) => {
+          context.loaders.userLoader.prime(user.id as UUID, user);
+        });
+
+        return users;
       },
     },
 
@@ -45,21 +52,14 @@ export const Query = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
       },
       resolve: async (_, { id: userId }: { id: string }, context: GqlContext) => {
-        return await context.prisma.user.findUnique({
-          where: { id: userId },
-        });
+        return await context.loaders.userLoader.load(userId);
       },
     },
 
     profiles: {
       type: new GraphQLList(ProfileType),
       resolve: async (_, __, context: GqlContext) => {
-        try {
-          return await context.prisma.profile.findMany();
-        } catch (error) {
-          console.error("Error fetching profiles:", error);
-          throw new Error("Failed to fetch profiles.");
-        }
+        return await context.prisma.profile.findMany();
       },
     },
 
@@ -69,21 +69,14 @@ export const Query = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
       },
       resolve: async (_, { id: profileId }: { id: string }, context: GqlContext) => {
-        return await context.prisma.profile.findUnique({
-          where: { id: profileId },
-        });
+        return context.loaders.profileIdLoader.load(profileId);
       },
     },
 
     posts: {
       type: new GraphQLList(PostType),
       resolve: async (_, __, context: GqlContext) => {
-        try {
-          return await context.prisma.post.findMany();
-        } catch (error) {
-          console.error("Error fetching posts:", error);
-          throw new Error("Failed to fetch posts.");
-        }
+        return context.prisma.post.findMany();
       },
     },
 
@@ -93,21 +86,14 @@ export const Query = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
       },
       resolve: async (_, { id: postId }: { id: string }, context: GqlContext) => {
-        return await context.prisma.post.findUnique({
-          where: { id: postId },
-        });
+        return await context.loaders.postLoader.load(postId);
       },
     },
 
     memberTypes: {
       type: new GraphQLList(MemberType),
-      resolve: async (_, __, context: GqlContext) => {
-        try {
-          return await context.prisma.memberType.findMany();
-        } catch (error) {
-          console.error("Error fetching member types:", error);
-          throw new Error("Failed to fetch member types.");
-        }
+      resolve: async (_, args, context: GqlContext) => {
+        return await context.prisma.memberType.findMany();
       },
     },
 
@@ -116,10 +102,12 @@ export const Query = new GraphQLObjectType({
       args: {
         id: { type: new GraphQLNonNull(MemberTypeId) },
       },
-      resolve: async (_, { id: memberTypeId }: { id: MemberTypeIdType }, context: GqlContext) => {
-        return await context.prisma.memberType.findUnique({
-          where: { id: memberTypeId },
-        });
+      resolve: async (
+        _,
+        { id: MemberTypeId }: { id: MemberTypeIdType },
+        context: GqlContext,
+      ) => {
+        return await context.loaders.membersLoader.load(MemberTypeId);
       },
     },
   },

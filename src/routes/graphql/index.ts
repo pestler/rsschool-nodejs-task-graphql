@@ -1,9 +1,13 @@
 import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { createGqlResponseSchema, gqlResponseSchema, gqlRootSchema } from './schemas.js';
 import { graphql } from 'graphql';
+import { prismaLoaders } from './loaders.js';
+
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma, httpErrors } = fastify;
+
+  const loaders = prismaLoaders(prisma);
 
   fastify.route({
     url: '/',
@@ -14,7 +18,7 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
         200: gqlResponseSchema,
       },
     },
-    async handler(req) {
+    async handler(req, reply) {
       try {
         const { query, variables } = req.body;
 
@@ -22,17 +26,21 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           throw httpErrors.badRequest("Query is required.");
         }
 
+        if (!prisma) {
+          throw httpErrors.internalServerError("Prisma client not initialized.");
+        }
+
         const result = await graphql({
           schema: gqlRootSchema,
           source: query,
           variableValues: variables ?? {},
-          contextValue: { prisma },
+          contextValue: { prisma, loaders },
         });
 
-        return result;
+        return reply.send(result);
       } catch (error) {
         console.error("GraphQL execution error:", error);
-        throw httpErrors.internalServerError("Internal Server Error.");
+        return reply.status(500).send({ errors: [{ message: "Internal Server Error." }] });
       }
     },
   });
