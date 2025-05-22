@@ -41,11 +41,11 @@ export const prismaLoaders = (prisma: PrismaClient) => {
             return ids.map((id) => posts.find((post) => post.id === id) ?? null);
         }),
 
-        memberLoader: new DataLoader<string, MemberType | null>(async (ids) => {
+        membersLoader: new DataLoader<string, MemberType | null>(async (ids) => {
             const memberTypes = await prisma.memberType.findMany({
-                where: { id: { in: Array.from(ids) } },
+                where: { id: { in: ids as string[] } },
             });
             return ids.map((id) => memberTypes.find((memberType) => memberType.id === id) ?? null);
-        }),
+        })
     };
 };
