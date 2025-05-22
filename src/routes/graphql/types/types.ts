@@ -1,54 +1,39 @@
-import {
-  GraphQLObjectType,
-  GraphQLString,
-  GraphQLFloat,
-  GraphQLEnumType,
-  GraphQLInt,
-  GraphQLBoolean,
-  GraphQLList,
-  GraphQLNonNull,
-} from 'graphql';
+import * as GraphQL from 'graphql';
 import { UUIDType } from './uuid.js';
-import {
-  MemberType as PrismaMemberType,
-  PrismaClient,
-  Profile,
-  User,
-  Post,
-} from '@prisma/client';
+import * as PrismaTypes from '@prisma/client';
 import DataLoader from 'dataloader';
 
-export const PostType = new GraphQLObjectType({
+export const PostType = new GraphQL.GraphQLObjectType({
   name: 'Post',
   fields: () => ({
     id: { type: UUIDType },
-    title: { type: GraphQLString },
-    content: { type: GraphQLString },
+    title: { type: GraphQL.GraphQLString },
+    content: { type: GraphQL.GraphQLString },
     authorId: { type: UUIDType },
   }),
 });
 
 type Loaders = {
-  userLoader: DataLoader<string, User>;
-  profileLoader: DataLoader<string, Profile>;
-  profileIdLoader: DataLoader<string, Profile>;
-  membersLoader: DataLoader<string, PrismaMemberType>;
-  memberLoader: DataLoader<string, PrismaMemberType>;
-  postsLoader: DataLoader<string, Post>;
-  postLoader: DataLoader<string, Post>;
+  userLoader: DataLoader<string, PrismaTypes.User>;
+  profileLoader: DataLoader<string, PrismaTypes.Profile>;
+  profileIdLoader: DataLoader<string, PrismaTypes.Profile>;
+  membersLoader: DataLoader<string, PrismaTypes.MemberType>;
+  memberLoader: DataLoader<string, PrismaTypes.MemberType>;
+  postsLoader: DataLoader<string, PrismaTypes.Post>;
+  postLoader: DataLoader<string, PrismaTypes.Post>;
 };
 
 export type GqlContext = {
-  prisma: PrismaClient;
+  prisma: PrismaTypes.PrismaClient;
   loaders: Loaders;
 };
 
-export const UserType: GraphQLObjectType = new GraphQLObjectType({
+export const UserType: GraphQL.GraphQLObjectType = new GraphQL.GraphQLObjectType({
   name: 'User',
   fields: () => ({
-    id: { type: new GraphQLNonNull(UUIDType) },
-    name: { type: new GraphQLNonNull(GraphQLString) },
-    balance: { type: new GraphQLNonNull(GraphQLFloat) },
+    id: { type: new GraphQL.GraphQLNonNull(UUIDType) },
+    name: { type: new GraphQL.GraphQLNonNull(GraphQL.GraphQLString) },
+    balance: { type: new GraphQL.GraphQLNonNull(GraphQL.GraphQLFloat) },
     profile: {
       type: ProfileType,
       resolve: async (parent: IUser, _, context: GqlContext) => {
@@ -61,7 +46,7 @@ export const UserType: GraphQLObjectType = new GraphQLObjectType({
       },
     },
     posts: {
-      type: new GraphQLList(PostType),
+      type: new GraphQL.GraphQLList(PostType),
       resolve: async (parent: IUser, _, context: GqlContext) => {
         try {
           return await context.loaders.postsLoader.load(parent.id);
@@ -72,7 +57,7 @@ export const UserType: GraphQLObjectType = new GraphQLObjectType({
       },
     },
     userSubscribedTo: {
-      type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(UserType))),
+      type: new GraphQL.GraphQLNonNull(new GraphQL.GraphQLList(new GraphQL.GraphQLNonNull(UserType))),
       resolve: async (parent: IUser, _args, context: GqlContext) => {
         try {
           return context.loaders.userLoader.loadMany(parent.userSubscribedTo?.map(s => s.authorId) ?? []);
@@ -83,7 +68,7 @@ export const UserType: GraphQLObjectType = new GraphQLObjectType({
       },
     },
     subscribedToUser: {
-      type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(UserType))),
+      type: new GraphQL.GraphQLNonNull(new GraphQL.GraphQLList(new GraphQL.GraphQLNonNull(UserType))),
       resolve: async (parent: IUser, _args, context: GqlContext) => {
         try {
           return context.loaders.userLoader.loadMany(parent.subscribedToUser?.map(s => s.subscriberId) ?? []);
@@ -96,8 +81,7 @@ export const UserType: GraphQLObjectType = new GraphQLObjectType({
   }),
 });
 
-
-export const MemberTypeId = new GraphQLEnumType({
+export const MemberTypeId = new GraphQL.GraphQLEnumType({
   name: 'MemberTypeId',
   values: {
     BASIC: { value: 'BASIC' },
@@ -105,22 +89,22 @@ export const MemberTypeId = new GraphQLEnumType({
   },
 });
 
-export const MemberType = new GraphQLObjectType({
+export const MemberType = new GraphQL.GraphQLObjectType({
   name: 'MemberType',
   fields: () => ({
     id: { type: MemberTypeId },
-    discount: { type: GraphQLFloat },
-    postsLimitPerMonth: { type: GraphQLInt },
+    discount: { type: GraphQL.GraphQLFloat },
+    postsLimitPerMonth: { type: GraphQL.GraphQLInt },
   }),
 });
 
-export const ProfileType = new GraphQLObjectType({
+export const ProfileType = new GraphQL.GraphQLObjectType({
   name: 'Profile',
   fields: () => ({
     id: { type: UUIDType },
-    isMale: { type: GraphQLBoolean },
-    yearOfBirth: { type: GraphQLInt },
-    memberTypeId: { type: GraphQLString },
+    isMale: { type: GraphQL.GraphQLBoolean },
+    yearOfBirth: { type: GraphQL.GraphQLInt },
+    memberTypeId: { type: GraphQL.GraphQLString },
     memberType: {
       type: MemberType,
       resolve: async (parent: { memberTypeId: string }, _, context: GqlContext) => {
@@ -129,6 +113,7 @@ export const ProfileType = new GraphQLObjectType({
     },
   }),
 });
+
 export enum MemberTypeIdType {
   BASIC = 'BASIC',
   BUSINESS = 'BUSINESS',
@@ -146,31 +131,20 @@ export interface ICreatePost {
   content: string;
   authorId: string;
 }
+
 export interface ICreateUser {
   name: string;
   balance: number;
 }
 
-export interface UserSubscriptions extends User {
-  userSubscribedTo?: {
-    subscriberId: string;
-    authorId: string;
-  }[];
-  subscribedToUser?: {
-    subscriberId: string;
-    authorId: string;
-  }[];
+export interface UserSubscriptions extends PrismaTypes.User {
+  userSubscribedTo?: { subscriberId: string; authorId: string }[];
+  subscribedToUser?: { subscriberId: string; authorId: string }[];
 }
+
 interface ISubscriptions {
   subscriberId: string;
   authorId: string;
-}
-
-interface IProfile {
-  id: string;
-  isMale: boolean;
-  yearOfBirth: number;
-  memberType: IMemberType;
 }
 
 export interface IUser {
@@ -183,14 +157,21 @@ export interface IUser {
   subscribedToUser?: ISubscriptions[];
 }
 
-interface IPost {
+interface IProfile {
   id: string;
-  title: string;
-  content: string;
+  isMale: boolean;
+  yearOfBirth: number;
+  memberType: IMemberType;
 }
 
 interface IMemberType {
   id: MemberTypeIdType;
   discount: number;
   postsLimitPerMonth: number;
+}
+
+interface IPost {
+  id: string;
+  title: string;
+  content: string;
 }
