@@ -1,104 +1,68 @@
-import * as GraphQL from 'graphql';
+import { GraphQLBoolean, GraphQLNonNull, GraphQLObjectType, GraphQLString } from 'graphql';
 import { UUIDType } from './uuid.js';
-import * as Inputs from './inputs.js';
-import * as Types from './types.js';
+import { CreatePostInput, CreateUserInput, CreateProfileInput, ChangePostInput, ChangeUserInput, ChangeProfileInput } from './inputs.js';
+import { PostType, UserType, ProfileType, GqlContext, ICreatePost, ICreateUser, ICreateProfile } from './types.js';
 
-export const Mutation = new GraphQL.GraphQLObjectType({
+export const Mutation = new GraphQLObjectType({
   name: 'Mutation',
   fields: {
     createPost: {
-      type: Types.PostType,
-
-      args: { dto: { type: new GraphQL.GraphQLNonNull(Inputs.CreatePostInput) } },
-      async resolve(_, { dto }: { dto: Types.ICreatePost }, context: Types.GqlContext) {
-        try {
-          return await context.prisma.post.create({ data: dto });
-        } catch (error) {
-          console.error("Error creating post:", error);
-          throw new Error("Failed to create post.");
-        }
-      },
+      type: PostType,
+      args: { dto: { type: CreatePostInput } },
+      resolve: (_, { dto }: { dto: ICreatePost }, context: GqlContext) => context.prisma.post.create({ data: dto }),
     },
     changePost: {
-      type: Types.PostType,
-      args: {
-        id: { type: new GraphQL.GraphQLNonNull(UUIDType) },
-        dto: { type: new GraphQL.GraphQLNonNull(Inputs.ChangePostInput) },
-      },
-      async resolve(_, { id, dto }: { id: string; dto: Partial<Types.ICreatePost> }, context: Types.GqlContext) {
-        try {
-          return await context.prisma.post.update({ where: { id }, data: dto });
-        } catch (error) {
-          console.error("Error updating post:", error);
-          throw new Error("Failed to update post.");
-        }
-      },
+      type: PostType,
+      args: { id: { type: new GraphQLNonNull(UUIDType) }, dto: { type: new GraphQLNonNull(ChangePostInput) } },
+      resolve: (_, { id, dto }: { id: string; dto: ICreatePost }, context: GqlContext) => context.prisma.post.update({ where: { id }, data: dto }),
     },
     deletePost: {
-      type: GraphQL.GraphQLBoolean,
-      args: { id: { type: new GraphQL.GraphQLNonNull(UUIDType) } },
-      async resolve(_, { id }: { id: string }, context: Types.GqlContext) {
-        try {
-          await context.prisma.post.delete({ where: { id } });
-          return true;
-        } catch (error) {
-          console.error("Error deleting post:", error);
-          return false;
-        }
-      },
+      type: GraphQLBoolean,
+      args: { id: { type: new GraphQLNonNull(UUIDType) } },
+      resolve: async (_, { id }: { id: string }, context: GqlContext) => !!(await context.prisma.post.delete({ where: { id } }).catch(() => false)),
     },
     createUser: {
-      type: Types.UserType,
-      args: { dto: { type: new GraphQL.GraphQLNonNull(Inputs.CreateUserInput) } },
-      async resolve(_, { dto }: { dto: Types.ICreateUser }, context: Types.GqlContext) {
-        try {
-          return await context.prisma.user.create({ data: dto });
-        } catch (error) {
-          console.error("Error creating user:", error);
-          throw new Error("Failed to create user.");
-        }
-      },
+      type: UserType,
+      args: { dto: { type: new GraphQLNonNull(CreateUserInput) } },
+      resolve: (_, { dto }: { dto: ICreateUser }, context: GqlContext) => context.prisma.user.create({ data: dto }),
+    },
+    changeUser: {
+      type: UserType,
+      args: { id: { type: new GraphQLNonNull(UUIDType) }, dto: { type: new GraphQLNonNull(ChangeUserInput) } },
+      resolve: (_, { id, dto }: { id: string; dto: ICreateUser }, context: GqlContext) => context.prisma.user.update({ where: { id }, data: dto }),
+    },
+    deleteUser: {
+      type: GraphQLBoolean,
+      args: { id: { type: new GraphQLNonNull(UUIDType) } },
+      resolve: async (_, { id }: { id: string }, context: GqlContext) => !!(await context.prisma.user.delete({ where: { id } }).catch(() => false)),
     },
     subscribeTo: {
-      type: new GraphQL.GraphQLNonNull(GraphQL.GraphQLString),
-      args: {
-        userId: { type: new GraphQL.GraphQLNonNull(UUIDType) },
-        authorId: { type: new GraphQL.GraphQLNonNull(UUIDType) },
-      },
-      async resolve(_, args: { userId: string; authorId: string }, context: Types.GqlContext) {
-        try {
-          const { userId: subscriberId, authorId } = args;
-          await context.prisma.subscribersOnAuthors.create({
-            data: { subscriberId, authorId },
-          });
-          return 'done';
-        } catch (error) {
-          console.error("Error subscribing:", error);
-          throw new Error("Failed to subscribe.");
-        }
+      type: new GraphQLNonNull(GraphQLString),
+      args: { userId: { type: new GraphQLNonNull(UUIDType) }, authorId: { type: new GraphQLNonNull(UUIDType) } },
+      resolve: async (_, { userId, authorId }: { userId: string; authorId: string }, context: GqlContext) => {
+        await context.prisma.subscribersOnAuthors.create({ data: { subscriberId: userId, authorId } });
+        return 'done';
       },
     },
     unsubscribeFrom: {
-      type: GraphQL.GraphQLBoolean,
-      args: {
-
-
-        userId: { type: new GraphQL.GraphQLNonNull(UUIDType) },
-        authorId: { type: new GraphQL.GraphQLNonNull(UUIDType) },
-      },
-      async resolve(_, args: { userId: string; authorId: string }, context: Types.GqlContext) {
-        try {
-          const { userId: subscriberId, authorId } = args;
-          await context.prisma.subscribersOnAuthors.delete({
-            where: { subscriberId_authorId: { subscriberId, authorId } },
-          });
-          return true;
-        } catch (error) {
-          console.error("Error unsubscribing:", error);
-          return false;
-        }
-      },
+      type: GraphQLBoolean,
+      args: { userId: { type: UUIDType }, authorId: { type: UUIDType } },
+      resolve: async (_, { userId, authorId }: { userId: string; authorId: string }, context: GqlContext) => !!(await context.prisma.subscribersOnAuthors.delete({ where: { subscriberId_authorId: { subscriberId: userId, authorId } } }).catch(() => false)),
+    },
+    createProfile: {
+      type: ProfileType,
+      args: { dto: { type: CreateProfileInput } },
+      resolve: (_, { dto }: { dto: ICreateProfile }, context: GqlContext) => context.prisma.profile.create({ data: dto }),
+    },
+    changeProfile: {
+      type: ProfileType,
+      args: { id: { type: new GraphQLNonNull(UUIDType) }, dto: { type: ChangeProfileInput } },
+      resolve: (_, { id, dto }: { id: string; dto: Partial<ICreateProfile> }, context: GqlContext) => context.prisma.profile.update({ where: { id }, data: dto }),
+    },
+    deleteProfile: {
+      type: GraphQLBoolean,
+      args: { id: { type: UUIDType } },
+      resolve: async (_, { id }: { id: string }, context: GqlContext) => !!(await context.prisma.profile.delete({ where: { id } }).catch(() => false)),
     },
   },
-
 });
